@@ -24,6 +24,10 @@ import (
 
 	exec "github.com/mesos/mesos-go/executor"
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"net/http"
+	"bytes"
+	"log"
+	"io/ioutil"
 )
 
 type exampleExecutor struct {
@@ -60,6 +64,17 @@ func (exec *exampleExecutor) LaunchTask(driver exec.ExecutorDriver, taskInfo *me
 
 	exec.tasksLaunched++
 	fmt.Println("Total tasks launched ", exec.tasksLaunched)
+	req, _ := http.NewRequest("POST", "http://10.251.232.40:3000/in", bytes.NewReader([]byte(fmt.Sprintf(`{"in":"Total tasks launched %v"}`, exec.tasksLaunched))))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalf("Got error", err)
+	}
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Got error", err)
+	}
+	fmt.Println("server responded with: "+ string(bytes))
+
 	//
 	// this is where one would perform the requested task
 	//
