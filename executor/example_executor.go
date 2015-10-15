@@ -22,35 +22,36 @@ import (
 	"flag"
 	"fmt"
 
-	exec "github.com/mesos/mesos-go/executor"
+	"github.com/mesos/mesos-go/executor"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"net/http"
 	"bytes"
 	"log"
 	"io/ioutil"
+	"os/exec"
 )
 
-type exampleExecutor struct {
+type migrationExecutor struct {
 	tasksLaunched int
 }
 
-func newExampleExecutor() *exampleExecutor {
-	return &exampleExecutor{tasksLaunched: 0}
+func newExampleExecutor() *migrationExecutor {
+	return &migrationExecutor{tasksLaunched: 0}
 }
 
-func (exec *exampleExecutor) Registered(driver exec.ExecutorDriver, execInfo *mesos.ExecutorInfo, fwinfo *mesos.FrameworkInfo, slaveInfo *mesos.SlaveInfo) {
+func (mExecutor *migrationExecutor) Registered(driver executor.ExecutorDriver, execInfo *mesos.ExecutorInfo, fwinfo *mesos.FrameworkInfo, slaveInfo *mesos.SlaveInfo) {
 	fmt.Println("Registered Executor on slave ", slaveInfo.GetHostname())
 }
 
-func (exec *exampleExecutor) Reregistered(driver exec.ExecutorDriver, slaveInfo *mesos.SlaveInfo) {
+func (mExecutor *migrationExecutor) Reregistered(driver executor.ExecutorDriver, slaveInfo *mesos.SlaveInfo) {
 	fmt.Println("Re-registered Executor on slave ", slaveInfo.GetHostname())
 }
 
-func (exec *exampleExecutor) Disconnected(exec.ExecutorDriver) {
+func (mExecutor *migrationExecutor) Disconnected(executor.ExecutorDriver) {
 	fmt.Println("Executor disconnected.")
 }
 
-func (exec *exampleExecutor) LaunchTask(driver exec.ExecutorDriver, taskInfo *mesos.TaskInfo) {
+func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 	fmt.Printf("Launching task %v with data [%#x]\n", taskInfo.GetName(), taskInfo.Data)
 
 	runStatus := &mesos.TaskStatus{
@@ -62,16 +63,25 @@ func (exec *exampleExecutor) LaunchTask(driver exec.ExecutorDriver, taskInfo *me
 		fmt.Println("Got error", err)
 	}
 
-	exec.tasksLaunched++
-	fmt.Println("Total tasks launched ", exec.tasksLaunched)
-	req, _ := http.NewRequest("POST", "http://10.251.232.40:3000/in", bytes.NewReader([]byte(fmt.Sprintf(`{"in":"Total tasks launched %v"}`, exec.tasksLaunched))))
+	mExecutor.tasksLaunched++
+
+//	out, err := exec.Command("echo", "foo").Output()
+//	cmdStr := "sudo docker run -v ~/exp/a.out:/a.out ubuntu:14.04 /a.out -m 10m"
+	cmdStr := "docker run -t busybox /bin/sh -c 'echo FOOBAR'"
+	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
+	if err != nil {
+		log.Fatalf("Got error 1", err, out)
+	}
+
+	fmt.Println("Here was the output of the docker run: ", string([]byte(fmt.Sprintf(`{"in":"%s"}`, out))))
+	req, _ := http.NewRequest("POST", "http://10.251.232.40:3000/in", bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, out))))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Fatalf("Got error", err)
+		log.Fatalf("Got error 2", err)
 	}
 	bytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("Got error", err)
+		log.Fatalf("Got error 3", err)
 	}
 	fmt.Println("server responded with: "+ string(bytes))
 
@@ -92,19 +102,19 @@ func (exec *exampleExecutor) LaunchTask(driver exec.ExecutorDriver, taskInfo *me
 	fmt.Println("Task finished", taskInfo.GetName())
 }
 
-func (exec *exampleExecutor) KillTask(exec.ExecutorDriver, *mesos.TaskID) {
+func (mExecutor *migrationExecutor) KillTask(executor.ExecutorDriver, *mesos.TaskID) {
 	fmt.Println("Kill task")
 }
 
-func (exec *exampleExecutor) FrameworkMessage(driver exec.ExecutorDriver, msg string) {
+func (mExecutor *migrationExecutor) FrameworkMessage(driver executor.ExecutorDriver, msg string) {
 	fmt.Println("Got framework message: ", msg)
 }
 
-func (exec *exampleExecutor) Shutdown(exec.ExecutorDriver) {
+func (mExecutor *migrationExecutor) Shutdown(executor.ExecutorDriver) {
 	fmt.Println("Shutting down the executor")
 }
 
-func (exec *exampleExecutor) Error(driver exec.ExecutorDriver, err string) {
+func (mExecutor *migrationExecutor) Error(driver executor.ExecutorDriver, err string) {
 	fmt.Println("Got error message:", err)
 }
 
@@ -115,10 +125,10 @@ func init() {
 func main() {
 	fmt.Println("Starting Example Executor (Go)")
 
-	dconfig := exec.DriverConfig{
+	dconfig := executor.DriverConfig{
 		Executor: newExampleExecutor(),
 	}
-	driver, err := exec.NewMesosExecutorDriver(dconfig)
+	driver, err := executor.NewMesosExecutorDriver(dconfig)
 
 	if err != nil {
 		fmt.Println("Unable to create a ExecutorDriver ", err.Error())
