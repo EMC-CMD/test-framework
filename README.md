@@ -1,4 +1,10 @@
-# mesos-framework-tutorial in Go
+# go playground for testing against mesos
+
+1. vagrant up
+2. install golang
+3. install direnv
+
+```cd $GOPATH/src/github.com/emc-cmd/test-framework && go build -o example_scheduler && cd executor/ && go build -o example_executor && cd $GOPATH/src/github.com/emc-cmd/test-framework && sudo ./example_scheduler --master=127.0.0.1:5050 --executor="$GOPATH/src/github.com/emc-cmd/test-framework/executor/example_executor" --logtostderr=true```
 
 ### 1) [Deploy a Mesos Cluster](https://github.com/mesosphere/playa-mesos)
 
