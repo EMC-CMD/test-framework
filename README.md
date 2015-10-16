@@ -33,7 +33,7 @@ sudo apt-get install libseccomp-dev -y && mkdir -p $GOPATH/src/github.com/openco
 
 6. install mesos
 ```
-sudo apt-get update && sudo apt-get install -y git openjdk-7-jdk autoconf libtool build-essential python-dev python-boto libcurl4-nss-dev libsasl2-dev maven libapr1-dev libsvn-dev && git clone https://git-wip-us.apache.org/repos/asf/mesos.git && cd mesos && ./bootstrap && mkdir build && cd build && ../configure && make && make check && make install
+sudo apt-get update && sudo apt-get install -y git openjdk-7-jdk autoconf libtool build-essential python-dev python-boto libcurl4-nss-dev libsasl2-dev maven libapr1-dev libsvn-dev && git clone https://git-wip-us.apache.org/repos/asf/mesos.git && cd mesos && ./bootstrap && mkdir build && cd build && ../configure && make && make install
 
 # Start mesos master (Ensure work directory exists and has proper permissions).
 mkdir -p /var/lib/mesos

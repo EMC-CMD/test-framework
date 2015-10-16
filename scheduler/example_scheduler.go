@@ -117,6 +117,12 @@ func (sched *ExampleScheduler) FrameworkMessage(s sched.SchedulerDriver, exId *m
 	log.Infof("Received framework message from executor '%v' on slave '%v': %s.\n", *exId, *slvId, msg)
 }
 
+
+/*
+	TODO: key/vale of SlaveIDs to tasks launched on those ids
+	if slave dies, get tasks launched on that Slave
+	migrate their containerId to a new node (remove dead slave from hash)
+ */
 func (sched *ExampleScheduler) SlaveLost(s sched.SchedulerDriver, id *mesos.SlaveID) {
 	log.Infof("Slave '%v' lost.\n", *id)
 }
