@@ -29,6 +29,8 @@ import (
 	"log"
 	"io/ioutil"
 	"os/exec"
+	"time"
+	"math/rand"
 )
 
 type migrationExecutor struct {
@@ -65,32 +67,48 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 
 	mExecutor.tasksLaunched++
 
-//	out, err := exec.Command("echo", "foo").Output()
-//	cmdStr := "sudo docker run -v ~/exp/a.out:/a.out ubuntu:14.04 /a.out -m 10m"
-	cmdStr := "docker run -t busybox /bin/sh -c 'echo FOOBAR'"
-	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
-	if err != nil {
-		log.Fatalf("Got error 1", err, out)
-	}
+	/***
+	run task
+	 ***/
+
+	containerName := fmt.Sprintf("migrate-me-%v", mExecutor.tasksLaunched)
+	url := "http://192.168.0.15:3000/in"
+
+	//run counter in docker container
+	cmdStr := fmt.Sprintf(`docker run -d --name %s busybox:latest /bin/sh -c 'i=0; while true; do echo "%s: $i"; i=$(expr $i + 1); sleep 1; done'`, containerName, containerName)
+	out := runCommand(cmdStr)
 	out = out[0:len(out)-2] //for some reason necessary?
+	respBytes := writeOutputToServer("Initialized docker container: "+out, url)
+	fmt.Println("server responded with: "+ string(respBytes))
 
-	fmt.Println("Here was the output of the docker run: ", string([]byte(fmt.Sprintf(`{"in":"%s"}`, out))))
-	req, _ := http.NewRequest("POST", "http://192.168.0.15:3000/in", bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, string(out)))))
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Fatalf("Got error 2", err)
+
+	//sleep random number of seconds between 5 - 20
+	r := rand.New(rand.NewSource(99))
+	seconds := r.Int() % 14 + 5
+	for i := 0; i < seconds ; i++ {
+		fmt.Printf("Sleeping... ", seconds-i-1, "left")
+		time.Sleep(1000 * time.Millisecond)
 	}
-	bytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Got error 3", err)
-	}
-	fmt.Println("server responded with: "+ string(bytes))
 
-	//
-	// this is where one would perform the requested task
-	//
+	//read logs from container
+	cmdStr = fmt.Sprintf(`docker logs %s`, containerName)
+	out = runCommand(cmdStr)
+	out = out[0:len(out)-2] //for some reason necessary?
+	respBytes = writeOutputToServer("Slept for "+string(seconds)+"and retrieved logs: "+out, url)
 
-	// finish task
+	//kill & rm container
+	cmdStr = fmt.Sprintf(`docker stop %s`, containerName)
+	out = runCommand(cmdStr)
+	out = out[0:len(out)-2] //for some reason necessary?
+	respBytes = writeOutputToServer("Stopped "+containerName+": "+out, url)
+	cmdStr = fmt.Sprintf(`docker rm %s`, containerName)
+	out = runCommand(cmdStr)
+	out = out[0:len(out)-2] //for some reason necessary?
+	respBytes = writeOutputToServer("Removed "+containerName+": "+out, url)
+
+	/***
+	 finish task
+	 ***/
 	fmt.Println("Finishing task", taskInfo.GetName())
 	finStatus := &mesos.TaskStatus{
 		TaskId: taskInfo.GetTaskId(),
@@ -102,6 +120,30 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	}
 	fmt.Println("Task finished", taskInfo.GetName())
 }
+
+func runCommand(command string) string {
+	cmdStr := fmt.Sprintf(`docker %s`, command)
+	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
+	if err != nil {
+		log.Fatalf("Got error running command: ", cmdStr)
+	}
+	return string(out)
+}
+
+func writeOutputToServer(output string, url string) (responseBytes []byte) {
+	fmt.Println("Here was the output of the docker run: ", string([]byte(fmt.Sprintf(`{"in":"%s"}`, output))))
+	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, output))))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalf("Got error 2", err)
+	}
+	responseBytes, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Got error 3", err)
+	}
+	return
+}
+
 
 func (mExecutor *migrationExecutor) KillTask(executor.ExecutorDriver, *mesos.TaskID) {
 	fmt.Println("Kill task")
