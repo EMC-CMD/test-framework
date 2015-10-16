@@ -35,6 +35,7 @@ type ExampleScheduler struct {
 	totalTasks    int
 	cpuPerTask    float64
 	memPerTask    float64
+	AllowedTasks  int
 }
 
 func NewExampleScheduler(exec *mesos.ExecutorInfo, taskCount int, cpuPerTask float64, memPerTask float64) *ExampleScheduler {
@@ -45,6 +46,7 @@ func NewExampleScheduler(exec *mesos.ExecutorInfo, taskCount int, cpuPerTask flo
 		totalTasks:    taskCount,
 		cpuPerTask:    cpuPerTask,
 		memPerTask:    memPerTask,
+		AllowedTasks:  1,
 	}
 }
 
@@ -62,6 +64,7 @@ func (sched *ExampleScheduler) Disconnected(sched.SchedulerDriver) {
 
 func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offers []*mesos.Offer) {
 	logOffers(offers)
+	log.Infof("received some offers, but do I care?")
 
 	for _, offer := range offers {
 		remainingCpus := getOfferCpu(offer)
@@ -69,7 +72,11 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 
 		var tasks []*mesos.TaskInfo
 		for sched.cpuPerTask <= remainingCpus &&
-			sched.memPerTask <= remainingMems {
+		sched.memPerTask <= remainingMems &&
+		sched.tasksLaunched < sched.AllowedTasks {
+
+			log.Infof("Launched tasks: "+string(sched.tasksLaunched))
+			log.Infof("Allowed tasks: "+string(sched.AllowedTasks))
 
 			sched.tasksLaunched++
 
@@ -96,7 +103,6 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 		log.Infoln("Launching ", len(tasks), "tasks for offer", offer.Id.GetValue())
 		driver.LaunchTasks([]*mesos.OfferID{offer.Id}, tasks, &mesos.Filters{RefuseSeconds: proto.Float64(1)})
 	}
-
 }
 
 func (sched *ExampleScheduler) StatusUpdate(driver sched.SchedulerDriver, status *mesos.TaskStatus) {

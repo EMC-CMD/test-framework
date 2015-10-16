@@ -32,6 +32,7 @@ import (
 	sched "github.com/mesos/mesos-go/scheduler"
 	. "github.com/emc-cmd/test-framework/scheduler"
 	. "github.com/emc-cmd/test-framework/server"
+	"github.com/emc-cmd/test-framework/trigger"
 )
 
 const (
@@ -73,6 +74,9 @@ func main() {
 		log.Fatalf("Failed to create scheduler with error: %v\n", err)
 		os.Exit(-2)
 	}
+
+	//Start trigger server
+	go trigger.RunTriggerServer(scheduler)
 
 	// Framework
 	fwinfo := &mesos.FrameworkInfo{

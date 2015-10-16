@@ -72,9 +72,10 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	if err != nil {
 		log.Fatalf("Got error 1", err, out)
 	}
+	out = out[0:len(out)-2] //for some reason necessary?
 
 	fmt.Println("Here was the output of the docker run: ", string([]byte(fmt.Sprintf(`{"in":"%s"}`, out))))
-	req, _ := http.NewRequest("POST", "http://10.251.232.40:3000/in", bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, out))))
+	req, _ := http.NewRequest("POST", "http://192.168.0.15:3000/in", bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, string(out)))))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Fatalf("Got error 2", err)
