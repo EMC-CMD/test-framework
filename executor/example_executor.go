@@ -122,7 +122,7 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 }
 
 func runCommand(command string) string {
-	cmdStr := fmt.Sprintf(`docker %s`, command)
+	cmdStr := fmt.Sprintf(`%s`, command)
 	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
 	if err != nil {
 		log.Fatalf("Got error running command: ", cmdStr)
