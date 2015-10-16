@@ -28,9 +28,9 @@ import (
 	"bytes"
 	"log"
 	"io/ioutil"
-	"os/exec"
 	"time"
 	"math/rand"
+	"github.com/emc-cmd/test-framework/containers"
 )
 
 type migrationExecutor struct {
@@ -74,9 +74,14 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	containerName := fmt.Sprintf("migrate-me-%v", mExecutor.tasksLaunched)
 	url := "http://192.168.0.15:3000/in"
 
+	container := docker.Docker{
+		Name: containerName,
+		Image: "busybox:latest",
+		Command: `/bin/sh -c 'i=0; while true; do echo "%s: $i"; i=$(expr $i + 1); sleep 1; done'`,
+	}
+
 	//run counter in docker container
-	cmdStr := fmt.Sprintf(`docker run -d --name %s busybox:latest /bin/sh -c 'i=0; while true; do echo "%s: $i"; i=$(expr $i + 1); sleep 1; done'`, containerName, containerName)
-	out := runCommand(cmdStr)
+	out := container.Run()
 	out = out[0:len(out)-2] //for some reason necessary?
 	respBytes := writeOutputToServer("Initialized docker container: "+out, url)
 	fmt.Println("server responded with: "+ string(respBytes))
@@ -91,18 +96,15 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	}
 
 	//read logs from container
-	cmdStr = fmt.Sprintf(`docker logs %s`, containerName)
-	out = runCommand(cmdStr)
+	out = container.Logs()
 	out = out[0:len(out)-2] //for some reason necessary?
 	respBytes = writeOutputToServer(fmt.Sprintf("Slept for "+string(seconds)+"and retrieved logs: %s", out), url)
 
 	//kill & rm container
-	cmdStr = fmt.Sprintf(`docker stop %s`, containerName)
-	out = runCommand(cmdStr)
+	out = container.Stop()
 	out = out[0:len(out)-2] //for some reason necessary?
 	respBytes = writeOutputToServer("Stopped "+containerName+": "+out, url)
-	cmdStr = fmt.Sprintf(`docker rm %s`, containerName)
-	out = runCommand(cmdStr)
+	out = container.RM()
 	out = out[0:len(out)-2] //for some reason necessary?
 	respBytes = writeOutputToServer("Removed "+containerName+": "+out, url)
 
@@ -119,15 +121,6 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 		fmt.Println("Got error", err)
 	}
 	fmt.Println("Task finished", taskInfo.GetName())
-}
-
-func runCommand(command string) string {
-	cmdStr := fmt.Sprintf(`%s`, command)
-	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
-	if err != nil {
-		log.Fatalf("Got error running command: ", cmdStr)
-	}
-	return string(out)
 }
 
 func writeOutputToServer(output string, url string) (responseBytes []byte) {
