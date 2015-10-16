@@ -86,7 +86,7 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	r := rand.New(rand.NewSource(99))
 	seconds := r.Int() % 14 + 5
 	for i := 0; i < seconds ; i++ {
-		fmt.Printf("Sleeping... ", seconds-i-1, "left")
+		fmt.Printf(fmt.Sprintf("Sleeping... %v left", seconds-i-1))
 		time.Sleep(1000 * time.Millisecond)
 	}
 
@@ -94,7 +94,7 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	cmdStr = fmt.Sprintf(`docker logs %s`, containerName)
 	out = runCommand(cmdStr)
 	out = out[0:len(out)-2] //for some reason necessary?
-	respBytes = writeOutputToServer("Slept for "+string(seconds)+"and retrieved logs: "+out, url)
+	respBytes = writeOutputToServer(fmt.Sprintf("Slept for "+string(seconds)+"and retrieved logs: %s", out), url)
 
 	//kill & rm container
 	cmdStr = fmt.Sprintf(`docker stop %s`, containerName)
@@ -131,7 +131,7 @@ func runCommand(command string) string {
 }
 
 func writeOutputToServer(output string, url string) (responseBytes []byte) {
-	fmt.Println("Here was the output of the docker run: ", string([]byte(fmt.Sprintf(`{"in":"%s"}`, output))))
+	fmt.Println("Here was the output of the command: "+ output)
 	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, output))))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
