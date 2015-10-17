@@ -31,6 +31,7 @@ import (
 	"time"
 	"math/rand"
 	"github.com/emc-cmd/test-framework/containers"
+	"github.com/emc-cmd/test-framework/shared"
 )
 
 type migrationExecutor struct {
@@ -38,7 +39,9 @@ type migrationExecutor struct {
 }
 
 func newExampleExecutor() *migrationExecutor {
-	return &migrationExecutor{tasksLaunched: 0}
+	return &migrationExecutor{
+		tasksLaunched: 0,
+	}
 }
 
 func (mExecutor *migrationExecutor) Registered(driver executor.ExecutorDriver, execInfo *mesos.ExecutorInfo, fwinfo *mesos.FrameworkInfo, slaveInfo *mesos.SlaveInfo) {
@@ -53,27 +56,7 @@ func (mExecutor *migrationExecutor) Disconnected(executor.ExecutorDriver) {
 	fmt.Println("Executor disconnected.")
 }
 
-func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, taskInfo *mesos.TaskInfo) {
-	fmt.Printf("Launching task %v with data [%#x]\n", taskInfo.GetName(), taskInfo.Data)
-
-	runStatus := &mesos.TaskStatus{
-		TaskId: taskInfo.GetTaskId(),
-		State:  mesos.TaskState_TASK_RUNNING.Enum(),
-	}
-	_, err := driver.SendStatusUpdate(runStatus)
-	if err != nil {
-		fmt.Println("Got error", err)
-	}
-
-	mExecutor.tasksLaunched++
-
-	/***
-	run task
-	 ***/
-
-	containerName := fmt.Sprintf("migrate-me-%v", mExecutor.tasksLaunched)
-	url := "http://192.168.0.15:3000/in"
-
+func (mExecutor *migrationExecutor) TestRunAndKillContainer(containerName string, url string) {
 	container := docker.Docker{
 		Name: containerName,
 		Image: "busybox:latest",
@@ -107,6 +90,42 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	out = container.RM()
 	out = out[0:len(out)-2] //for some reason necessary?
 	respBytes = writeOutputToServer("Removed "+containerName+": "+out, url)
+
+}
+
+func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, taskInfo *mesos.TaskInfo) {
+	fmt.Printf("Launching task %v with data [%#x]\n", taskInfo.GetName(), taskInfo.Data)
+
+	runStatus := &mesos.TaskStatus{
+		TaskId: taskInfo.GetTaskId(),
+		State:  mesos.TaskState_TASK_RUNNING.Enum(),
+	}
+	_, err := driver.SendStatusUpdate(runStatus)
+	if err != nil {
+		fmt.Println("Got error", err)
+	}
+
+	mExecutor.tasksLaunched++
+
+	/***
+	run task
+	 ***/
+
+	taskType := getValueFromLabels(taskInfo.Labels, shared.TASK_TYPE)
+	url := getValueFromLabels(taskInfo.Labels, shared.FILESERVER_IP)
+	containerName := getValueFromLabels(taskInfo.Labels, shared.CONTAINER_NAME)
+
+	switch taskType {
+	case shared.RUN_CONTAINER:
+		break
+	case shared.CHECKPOINT_CONTAINER:
+		break
+	case shared.RESTORE_CONTAINER:
+		break
+	case shared.TEST_TASK:
+		mExecutor.TestRunAndKillContainer(containerName, url)
+		break
+	}
 
 	/***
 	 finish task
@@ -156,6 +175,16 @@ func (mExecutor *migrationExecutor) Error(driver executor.ExecutorDriver, err st
 
 func init() {
 	flag.Parse()
+}
+
+func getValueFromLabels(labels *mesos.Labels, key string) string {
+	for _, label := range labels.Labels {
+		if *label.Key == key {
+			return *label.Value
+		}
+	}
+	log.Fatalf("KEY %s NOT FOUND IN TASK INFO! Here were the labels, if you want to see: %v", key, labels)
+	return ""
 }
 
 func main() {

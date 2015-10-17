@@ -37,9 +37,10 @@ type ExampleScheduler struct {
 	cpuPerTask    float64
 	memPerTask    float64
 	TaskQueue	[]*mesos.TaskInfo
+	ExternalServer string
 }
 
-func NewExampleScheduler(exec *mesos.ExecutorInfo, taskCount int, cpuPerTask float64, memPerTask float64) *ExampleScheduler {
+func NewExampleScheduler(exec *mesos.ExecutorInfo, taskCount int, cpuPerTask float64, memPerTask float64, ip string) *ExampleScheduler {
 	return &ExampleScheduler{
 		executor:      exec,
 		tasksLaunched: 0,
@@ -47,6 +48,7 @@ func NewExampleScheduler(exec *mesos.ExecutorInfo, taskCount int, cpuPerTask flo
 		totalTasks:    taskCount,
 		cpuPerTask:    cpuPerTask,
 		memPerTask:    memPerTask,
+		ExternalServer: ip,
 	}
 }
 
@@ -117,12 +119,23 @@ func (sched *ExampleScheduler) Error(driver sched.SchedulerDriver, err string) {
 	log.Infoln("Scheduler received error:", err)
 }
 
+func (sched *ExampleScheduler) TestTask(containerID string) {
+	log.Infoln("Generating RUN_CONTAINER task...")
+	tags := map[string]string{
+		shared.TASK_TYPE : shared.TEST_TASK,
+		shared.CONTAINER_NAME: containerID,
+		shared.FILESERVER_IP: sched.ExternalServer,
+	}
+	task := sched.genTask(tags)
+	sched.pushTask(task)
+}
 
 func (sched *ExampleScheduler) RunContainerTask(containerID string) {
 	log.Infoln("Generating RUN_CONTAINER task...")
 	tags := map[string]string{
 		shared.TASK_TYPE : shared.RUN_CONTAINER,
 		shared.CONTAINER_NAME: containerID,
+		shared.FILESERVER_IP: sched.ExternalServer,
 	}
 	task := sched.genTask(tags)
 	sched.pushTask(task)
@@ -133,6 +146,7 @@ func (sched *ExampleScheduler) CheckpointContainerTask(containerID string) {
 	tags := map[string]string{
 		shared.TASK_TYPE : shared.CHECKPOINT_CONTAINER,
 		shared.CONTAINER_NAME: containerID,
+		shared.FILESERVER_IP: sched.ExternalServer,
 	}
 	task := sched.genTask(tags)
 	sched.pushTask(task)
@@ -143,6 +157,7 @@ func (sched *ExampleScheduler) RestoreContainerTask(containerID string) {
 	tags := map[string]string{
 		shared.TASK_TYPE : shared.RESTORE_CONTAINER,
 		shared.CONTAINER_NAME: containerID,
+		shared.FILESERVER_IP: sched.ExternalServer,
 	}
 	task := sched.genTask(tags)
 	sched.pushTask(task)
@@ -167,11 +182,9 @@ func (sched *ExampleScheduler) genTask(tags map[string]string) *mesos.TaskInfo {
 		},
 	}
 	for key, value := range tags {
-		label := &mesos.Label{
-			Key: &key,
-			Value: &value,
-		}
-		labels.Labels = append(labels.Labels, label)
+		log.Infoln("Tag being processed: "+key+" : "+value)
+		labels.Labels = append(labels.Labels, createLabel(key, value))
+		log.Infoln("Current tags: %v", labels)
 	}
 	task := &mesos.TaskInfo{
 		Name:     proto.String("go-task-" + taskId.GetValue()),
@@ -184,4 +197,12 @@ func (sched *ExampleScheduler) genTask(tags map[string]string) *mesos.TaskInfo {
 		Labels: labels,
 	}
 	return task
+}
+
+func createLabel(key string, value string) *mesos.Label{
+	return &mesos.Label{
+		Key: &key,
+		Value: &value,
+	}
+
 }

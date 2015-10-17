@@ -48,6 +48,7 @@ var (
 	master       = flag.String("master", "127.0.0.1:5050", "Master address <ip:port>")
 	executorPath = flag.String("executor", "./example_executor", "Path to test executor")
 	taskCount    = flag.String("task-count", "5", "Total task count to run.")
+	externalServer    = flag.String("externalServer", "192.168.0.15", "IP Address of the external server for hosting container files.")
 )
 
 func init() {
@@ -69,7 +70,7 @@ func main() {
 		os.Exit(-1)
 	}
 
-	scheduler := NewExampleScheduler(exec, numTasks, CPUS_PER_TASK, MEM_PER_TASK)
+	scheduler := NewExampleScheduler(exec, numTasks, CPUS_PER_TASK, MEM_PER_TASK, *externalServer)
 	if err != nil {
 		log.Fatalf("Failed to create scheduler with error: %v\n", err)
 		os.Exit(-2)
