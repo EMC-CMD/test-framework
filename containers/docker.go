@@ -23,10 +23,10 @@ type Tarball struct {
 }
 
 func (d *Docker) Create() string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
-	if d.Image == "" || d.Image == nil {
+	if d.Image == "" {
 		log.Fatalf("Image needs to be specified")
 	}
 	cmd := fmt.Sprintf(`create %s --name %s`, d.Image, d.Name)
@@ -34,10 +34,10 @@ func (d *Docker) Create() string {
 }
 
 func (d *Docker) RM() string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
-	if d.Image == "" || d.Image == nil {
+	if d.Image == "" {
 		log.Fatalf("Image needs to be specified")
 	}
 	cmd := fmt.Sprintf(`rm %s`, d.Name)
@@ -45,10 +45,10 @@ func (d *Docker) RM() string {
 }
 
 func (d *Docker) Start() string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
-	if d.Image == "" || d.Image == nil {
+	if d.Image == "" {
 		log.Fatalf("Image needs to be specified")
 	}
 	cmd := fmt.Sprintf(`start %s`, d.Name)
@@ -56,10 +56,10 @@ func (d *Docker) Start() string {
 }
 
 func (d *Docker) Stop() string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
-	if d.Image == "" || d.Image == nil {
+	if d.Image == "" {
 		log.Fatalf("Image needs to be specified")
 	}
 	cmd := fmt.Sprintf(`stop %s`, d.Name)
@@ -67,10 +67,10 @@ func (d *Docker) Stop() string {
 }
 
 func (d *Docker) Run() string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
-	if d.Image == "" || d.Image == nil {
+	if d.Image == "" {
 		log.Fatalf("Image needs to be specified")
 	}
 	cmd := fmt.Sprintf(`run %s %s --name %s`, d.Image, d.Command, d.Name)
@@ -78,14 +78,14 @@ func (d *Docker) Run() string {
 }
 
 func (d *Docker) Logs() string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
 	return dockerCommand("logs " + d.Name)
 }
 
 func (d *Docker) Checkpoint(imageDir string) string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
 	cmd := fmt.Sprintf(`checkpoint --image-dir=%s %s`, imageDir, d.Name)
@@ -93,7 +93,7 @@ func (d *Docker) Checkpoint(imageDir string) string {
 }
 
 func (d *Docker) Restore(imageDir string) string {
-	if d.Name == "" || d.Name == nil {
+	if d.Name == "" {
 		log.Fatalf("Container needs to be named")
 	}
 	cmd := fmt.Sprintf(`restore --force=true --image-dir=%s %s`, imageDir, d.Name)
@@ -116,14 +116,14 @@ func (d *Docker) Export(url string) string {
 		log.Fatalf("Error reading tarball during export: %s", err.Error())
 	}
 	tarball := Tarball{
-		Container: d,
+		Container: *d,
 		Data: data,
 	}
 	body, err := json.Marshal(tarball)
 	if err != nil {
 		log.Fatalf("Error marshalling tarball to json: %s", err.Error())
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/upload_container", url), body)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/upload_container", url), bytes.NewReader(body))
 	if err != nil {
 		log.Fatalf("Error generating request: %s", err.Error())
 	}
@@ -131,7 +131,7 @@ func (d *Docker) Export(url string) string {
 	if err != nil {
 		log.Fatalf("Error sending request: %s", err.Error())
 	}
-	body, err = ioutil.ReadAll(bytes.NewReader(resp.Body))
+	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalf("Error reading response from upload: %s", err.Error())
 	}
@@ -152,7 +152,7 @@ func Import(url string, containerName string) *Docker {
 	if err != nil {
 		log.Fatalf("Error sending request: %s", err.Error())
 	}
-	body, err := ioutil.ReadAll(bytes.NewReader(resp.Body))
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalf("Error reading response from upload: %s", err.Error())
 	}
@@ -175,7 +175,7 @@ func Import(url string, containerName string) *Docker {
 	os.Remove(tarPath)
 	container := tarball.Container
 	container.Restore(imageDir)
-	return container
+	return &container
 }
 
 
