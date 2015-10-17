@@ -73,7 +73,7 @@ func (d *Docker) Run() string {
 	if d.Image == "" {
 		log.Fatalf("Image needs to be specified")
 	}
-	cmd := fmt.Sprintf(`run %s %s --name %s`, d.Image, d.Command, d.Name)
+	cmd := fmt.Sprintf(`run -d --name %s %s %s`, d.Name, d.Image, d.Command)
 	return dockerCommand(cmd)
 }
 
@@ -181,9 +181,11 @@ func Import(url string, containerName string) *Docker {
 
 func dockerCommand(command string) string {
 	cmdStr := fmt.Sprintf(`docker %s`, command)
+	fmt.Printf("Running command: %s", cmdStr)
 	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
 	if err != nil {
 		log.Fatalf("Got error running command: ", cmdStr)
 	}
+	fmt.Printf("Output was: %s", out)
 	return string(out)
 }

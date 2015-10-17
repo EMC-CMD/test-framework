@@ -9,11 +9,21 @@ import (
 func RunTriggerServer(sched *scheduler.ExampleScheduler) {
 	m := martini.Classic()
 	m.Get("/", func() string {
-		return "GET /trigger to create and checkpoint a container!\n"
+		instructions := fmt.Sprintf("GET / for help\nGET /create/:container_id\nGET /checkpoint/:container_id\nGET /restore/:container_id")
+		return instructions
 	})
-	m.Get("/trigger", func() string {
-		sched.AllowedTasks++
-		return fmt.Sprintf("now allowing up tp %v tasks", sched.AllowedTasks)
+	m.Get("/create/:container_name", func(params martini.Params) string {
+		sched.RunContainerTask(params["container_name"])
+		return fmt.Sprintf("RunContainerTask queued...\nTask Queue: %v", sched.TaskQueue)
 	})
+	m.Get("/checkpoint/:container_name", func(params martini.Params) string {
+		sched.CheckpointContainerTask(params["container_name"])
+		return fmt.Sprintf("CheckpointContainerTask queued...\nTask Queue: %v", sched.TaskQueue)
+	})
+	m.Get("/restore/:container_name", func(params martini.Params) string {
+		sched.RestoreContainerTask(params["container_name"])
+		return fmt.Sprintf("RestoreContainerTask queued...\nTask Queue: %v", sched.TaskQueue)
+	})
+
 	m.Run()
 }

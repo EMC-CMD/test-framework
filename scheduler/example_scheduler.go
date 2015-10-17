@@ -26,6 +26,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	util "github.com/mesos/mesos-go/mesosutil"
 	sched "github.com/mesos/mesos-go/scheduler"
+	"github.com/emc-cmd/test-framework/shared"
 )
 
 type ExampleScheduler struct {
@@ -35,7 +36,7 @@ type ExampleScheduler struct {
 	totalTasks    int
 	cpuPerTask    float64
 	memPerTask    float64
-	AllowedTasks  int
+	TaskQueue	[]*mesos.TaskInfo
 }
 
 func NewExampleScheduler(exec *mesos.ExecutorInfo, taskCount int, cpuPerTask float64, memPerTask float64) *ExampleScheduler {
@@ -46,7 +47,6 @@ func NewExampleScheduler(exec *mesos.ExecutorInfo, taskCount int, cpuPerTask flo
 		totalTasks:    taskCount,
 		cpuPerTask:    cpuPerTask,
 		memPerTask:    memPerTask,
-		AllowedTasks:  1,
 	}
 }
 
@@ -73,27 +73,15 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 		var tasks []*mesos.TaskInfo
 		for sched.cpuPerTask <= remainingCpus &&
 		sched.memPerTask <= remainingMems &&
-		sched.tasksLaunched < sched.AllowedTasks {
+		len(sched.TaskQueue) > 0 {
 
 			log.Infof("Launched tasks: "+string(sched.tasksLaunched))
-			log.Infof("Allowed tasks: "+string(sched.AllowedTasks))
+			log.Infof("Tasks remaining ot be launched: "+string(len(sched.TaskQueue)))
 
 			sched.tasksLaunched++
 
-			taskId := &mesos.TaskID{
-				Value: proto.String(strconv.Itoa(sched.tasksLaunched)),
-			}
-
-			task := &mesos.TaskInfo{
-				Name:     proto.String("go-task-" + taskId.GetValue()),
-				TaskId:   taskId,
-				SlaveId:  offer.SlaveId,
-				Executor: sched.executor,
-				Resources: []*mesos.Resource{
-					util.NewScalarResource("cpus", sched.cpuPerTask),
-					util.NewScalarResource("mem", sched.memPerTask),
-				},
-			}
+			task := sched.popTask()
+			task.SlaveId = offer.SlaveId
 			log.Infof("Prepared task: %s with offer %s for launch\n", task.GetName(), offer.Id.GetValue())
 
 			tasks = append(tasks, task)
@@ -117,12 +105,6 @@ func (sched *ExampleScheduler) FrameworkMessage(s sched.SchedulerDriver, exId *m
 	log.Infof("Received framework message from executor '%v' on slave '%v': %s.\n", *exId, *slvId, msg)
 }
 
-
-/*
-	TODO: key/vale of SlaveIDs to tasks launched on those ids
-	if slave dies, get tasks launched on that Slave
-	migrate their containerId to a new node (remove dead slave from hash)
- */
 func (sched *ExampleScheduler) SlaveLost(s sched.SchedulerDriver, id *mesos.SlaveID) {
 	log.Infof("Slave '%v' lost.\n", *id)
 }
@@ -133,4 +115,73 @@ func (sched *ExampleScheduler) ExecutorLost(s sched.SchedulerDriver, exId *mesos
 
 func (sched *ExampleScheduler) Error(driver sched.SchedulerDriver, err string) {
 	log.Infoln("Scheduler received error:", err)
+}
+
+
+func (sched *ExampleScheduler) RunContainerTask(containerID string) {
+	log.Infoln("Generating RUN_CONTAINER task...")
+	tags := map[string]string{
+		shared.TASK_TYPE : shared.RUN_CONTAINER,
+		shared.CONTAINER_NAME: containerID,
+	}
+	task := sched.genTask(tags)
+	sched.pushTask(task)
+}
+
+func (sched *ExampleScheduler) CheckpointContainerTask(containerID string) {
+	log.Infoln("Generating CHECKPOINT_CONTAINER task...")
+	tags := map[string]string{
+		shared.TASK_TYPE : shared.CHECKPOINT_CONTAINER,
+		shared.CONTAINER_NAME: containerID,
+	}
+	task := sched.genTask(tags)
+	sched.pushTask(task)
+}
+
+func (sched *ExampleScheduler) RestoreContainerTask(containerID string) {
+	log.Infoln("Generating RESTORE_CONTAINER task...")
+	tags := map[string]string{
+		shared.TASK_TYPE : shared.RESTORE_CONTAINER,
+		shared.CONTAINER_NAME: containerID,
+	}
+	task := sched.genTask(tags)
+	sched.pushTask(task)
+}
+
+func (sched *ExampleScheduler) pushTask(task *mesos.TaskInfo) {
+	sched.TaskQueue = append(sched.TaskQueue, task)
+}
+
+func (sched *ExampleScheduler) popTask() *mesos.TaskInfo{
+	task := sched.TaskQueue[len(sched.TaskQueue)-1]
+	sched.TaskQueue = sched.TaskQueue[:len(sched.TaskQueue)-1]
+	return task
+}
+
+func (sched *ExampleScheduler) genTask(tags map[string]string) *mesos.TaskInfo {
+	taskId := &mesos.TaskID{
+		Value: proto.String(strconv.Itoa(sched.tasksLaunched)),
+	}
+	labels := &mesos.Labels{
+		Labels: []*mesos.Label{
+		},
+	}
+	for key, value := range tags {
+		label := &mesos.Label{
+			Key: &key,
+			Value: &value,
+		}
+		labels.Labels = append(labels.Labels, label)
+	}
+	task := &mesos.TaskInfo{
+		Name:     proto.String("go-task-" + taskId.GetValue()),
+		TaskId:   taskId,
+		Executor: sched.executor,
+		Resources: []*mesos.Resource{
+			util.NewScalarResource("cpus", sched.cpuPerTask),
+			util.NewScalarResource("mem", sched.memPerTask),
+		},
+		Labels: labels,
+	}
+	return task
 }
