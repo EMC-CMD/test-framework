@@ -99,7 +99,7 @@ func (d *Docker) Restore(imageDir string) string {
 	cmd := fmt.Sprintf(`restore --force=true --image-dir=%s %s`, imageDir, d.Name)
 	out := dockerCommand(cmd)
 	os.RemoveAll(imageDir)
-	return dockerCommand(out)
+	return string(out)
 }
 
 func (d *Docker) Export(url string) string {
@@ -144,7 +144,7 @@ func (d *Docker) Export(url string) string {
 }
 
 func Import(url string, containerName string) *Docker {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/upload_container/%s", url, containerName), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/download_container/%s", url, containerName), nil)
 	if err != nil {
 		log.Fatalf("Error generating request: %s", err.Error())
 	}
@@ -167,7 +167,8 @@ func Import(url string, containerName string) *Docker {
 		log.Fatalf("Could not write downloaded tarball to disk")
 	}
 	imageDir := fmt.Sprintf("/tmp/checkpoint_%s", containerName)
-	cmdStr := fmt.Sprintf("tar -xf %s -C %s  --absolute-names", tarPath, imageDir)
+	os.Mkdir(imageDir, 0666)
+	cmdStr := fmt.Sprintf("tar -xf %s -C %s  -P", tarPath, imageDir)
 	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
 	if err != nil {
 		log.Fatalf("Error running untar command: %s, %s, %s", cmdStr, err.Error(), out)
