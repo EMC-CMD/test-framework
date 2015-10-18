@@ -110,6 +110,11 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 				}
 				foundAMatch = true
 				break
+			case shared.TaskTypes.GET_LOGS:
+				if targetHost == offer.GetHostname() {
+					foundAMatch = sched.ContainerSlaveMap[containerName] == targetHost
+				}
+				break
 			case shared.TaskTypes.CHECKPOINT_CONTAINER:
 				if targetHost == offer.GetHostname() {
 					foundAMatch = sched.ContainerSlaveMap[containerName] == targetHost
@@ -250,6 +255,23 @@ func (sched *ExampleScheduler) RestoreContainerTask(containerName string, target
 		shared.Tags.CONTAINER_NAME: containerName,
 		shared.Tags.FILESERVER_IP: sched.ExternalServer,
 		shared.Tags.TARGET_HOST: targetHost,
+	}
+	task := sched.genTask(tags)
+	sched.pushTask(task)
+}
+
+func (sched *ExampleScheduler) GetLogsTask(containerName string) {
+	if _, ok := sched.ContainerSlaveMap[containerName]; !ok {
+		msg := containerName+" has not been launched yet!"
+		log.Infof(msg)
+		return
+	}
+	log.Infoln("Generating GET_LOGS task...")
+	tags := map[string]string{
+		shared.Tags.TASK_TYPE : shared.TaskTypes.GET_LOGS,
+		shared.Tags.CONTAINER_NAME: containerName,
+		shared.Tags.FILESERVER_IP: sched.ExternalServer,
+		shared.Tags.TARGET_HOST: sched.ContainerSlaveMap[containerName],
 	}
 	task := sched.genTask(tags)
 	sched.pushTask(task)

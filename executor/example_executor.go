@@ -127,6 +127,19 @@ func (mExecutor *migrationExecutor) RestoreContainer(containerName string, url s
 	fmt.Println("server responded with: "+ string(respBytes))
 }
 
+func (mExecutor *migrationExecutor) GetLogsFromContainer(containerName string, url string) {
+	container := docker.Docker{
+		Name: containerName,
+		Image: "busybox:latest",
+		Command: `/bin/sh -c 'i=0; while true; do echo "%s: $i"; i=$(expr $i + 1); sleep 1; done'`,
+	}
+
+	out := container.Logs()
+	out = out[0:len(out)-2] //for some reason necessary?
+	respBytes := writeOutputToServer("Checkpointed docker container: "+out, url)
+	fmt.Println("server responded with: "+ string(respBytes))
+}
+
 func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 	fmt.Printf("Launching task %v with data [%#x]\n", taskInfo.GetName(), taskInfo.Data)
 
@@ -162,17 +175,17 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	case shared.TaskTypes.RUN_CONTAINER:
 		mExecutor.StartContainer(containerName, url)
 		break
-		break
 	case shared.TaskTypes.CHECKPOINT_CONTAINER:
 		mExecutor.CheckpointContainer(containerName, url)
-		break
 		break
 	case shared.TaskTypes.RESTORE_CONTAINER:
 		mExecutor.RestoreContainer(containerName, url)
 		break
-		break
 	case shared.TaskTypes.TEST_TASK:
 		mExecutor.TestRunAndKillContainer(containerName, url)
+		break
+	case shared.TaskTypes.GET_LOGS:
+		mExecutor.GetLogsFromContainer(containerName, url)
 		break
 	}
 

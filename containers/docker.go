@@ -89,7 +89,9 @@ func (d *Docker) Checkpoint(imageDir string) string {
 		log.Fatalf("Container needs to be named")
 	}
 	cmd := fmt.Sprintf(`checkpoint --image-dir=%s %s`, imageDir, d.Name)
-	return dockerCommand(cmd)
+	out := dockerCommand(cmd)
+	out += "\n" + d.RM()
+	return out
 }
 
 func (d *Docker) Restore(imageDir string) string {

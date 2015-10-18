@@ -25,5 +25,11 @@ func RunTriggerServer(sched *scheduler.ExampleScheduler) {
 		return fmt.Sprintf("RestoreContainerTask queued...\nTask Queue: %v", sched.TaskQueue)
 	})
 
+
+	m.Get("/logs/:container_name", func(params martini.Params) string {
+		sched.GetLogsTask(params["container_name"])
+		return fmt.Sprintf("GetLogsTask queued...\nTask Queue: %v", sched.TaskQueue)
+	})
+
 	m.Run()
 }
