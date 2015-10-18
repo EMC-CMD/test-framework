@@ -106,7 +106,7 @@ func (d *Docker) Export(url string) string {
 	imageDir := fmt.Sprintf("/tmp/checkpoint_%s", d.Name)
 	d.Checkpoint(imageDir)
 	tarPath := fmt.Sprintf("/tmp/checkpoint_%s.tar.gz", d.Name)
-	cmdStr := fmt.Sprintf("tar czf %s %s", tarPath, imageDir)
+	cmdStr := fmt.Sprintf("tar czf %s %s --absolute-names", tarPath, imageDir)
 	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
 	if err != nil {
 		log.Fatalf("Error running tar command: %s, %s, %s", cmdStr, err.Error(), out)
@@ -167,7 +167,7 @@ func Import(url string, containerName string) *Docker {
 		log.Fatalf("Could not write downloaded tarball to disk")
 	}
 	imageDir := fmt.Sprintf("/tmp/checkpoint_%s", containerName)
-	cmdStr := fmt.Sprintf("tar -xf %s -C %s", tarPath, imageDir)
+	cmdStr := fmt.Sprintf("tar -xf %s -C %s  --absolute-names", tarPath, imageDir)
 	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
 	if err != nil {
 		log.Fatalf("Error running untar command: %s, %s, %s", cmdStr, err.Error(), out)

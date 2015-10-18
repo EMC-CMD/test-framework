@@ -87,17 +87,17 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 			task := sched.popTask()
 			taskType, err := shared.GetValueFromLabels(task.Labels, shared.Tags.TASK_TYPE)
 			if err != nil{
-				log.Errorf("Malformed task info, discarding task %v", task)
+				log.Infof("ERROR: Malformed task info, discarding task %v", task)
 				return
 			}
 			targetHost, err := shared.GetValueFromLabels(task.Labels, shared.Tags.TARGET_HOST)
-			if err != nil{
-				log.Errorf("Malformed task info, discarding task %v", task)
+			if err != nil && taskType != shared.TaskTypes.RUN_CONTAINER {
+				log.Infof("ERROR: Malformed task info, discarding task %v", task)
 				return
 			}
 			containerName, err := shared.GetValueFromLabels(task.Labels, shared.Tags.CONTAINER_NAME)
 			if err != nil{
-				log.Errorf("Malformed task info, discarding task %v", task)
+				log.Infof("ERROR: Malformed task info, discarding task %v", task)
 				return
 			}
 
@@ -105,7 +105,7 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 			switch taskType{
 			case shared.TaskTypes.RESTORE_CONTAINER:
 				if _, ok := sched.ContainerSlaveMap[containerName]; ok {
-					log.Errorf("%s is already running", containerName)
+					log.Infof("ERROR: %s is already running", containerName)
 					return
 				}
 				foundAMatch = true
@@ -117,7 +117,7 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 				break
 			case shared.TaskTypes.RESTORE_CONTAINER:
 				if _, ok := sched.ContainerSlaveMap[containerName]; ok {
-					log.Errorf("%s is already running", containerName)
+					log.Infof("ERROR: %s is already running", containerName)
 					return
 				}
 				if targetHost == offer.GetHostname() {
@@ -130,7 +130,7 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 			}
 			if foundAMatch {
 				task.SlaveId = offer.SlaveId
-				task.Labels = append(task.Labels, shared.CreateLabel(shared.Tags.ACCEPTED_HOST, offer.Hostname)
+				task.Labels.Labels = append(task.Labels.Labels, shared.CreateLabel(shared.Tags.ACCEPTED_HOST, *offer.Hostname))
 				log.Infof("Prepared task: %s with offer %s for launch\n", task.GetName(), offer.Id.GetValue())
 
 				tasks = append(tasks, task)
@@ -148,32 +148,34 @@ func (sched *ExampleScheduler) ResourceOffers(driver sched.SchedulerDriver, offe
 func (sched *ExampleScheduler) StatusUpdate(driver sched.SchedulerDriver, status *mesos.TaskStatus) {
 	log.Infoln("Status update: task", status.TaskId.GetValue(), " is in state ", status.State.Enum().String())
 	//if RunContainer finished, add
-	labels := status.GetLabels()
-	taskType, err := shared.GetValueFromLabels(labels, shared.Tags.TASK_TYPE)
-	if err != nil{
-		log.Errorf("Malformed task info, discarding task with status: %v", status)
-		return
-	}
-	acceptedHost, err := shared.GetValueFromLabels(labels, shared.Tags.ACCEPTED_HOST)
-	if err != nil{
-		log.Errorf("Malformed task info, discarding task with status: %v", status)
-		return
-	}
-	containerName, err := shared.GetValueFromLabels(labels, shared.Tags.CONTAINER_NAME)
-	if err != nil{
-		log.Errorf("Malformed task info, discarding task with status: %v", status)
-		return
-	}
-	switch taskType {
-	case shared.TaskTypes.RUN_CONTAINER:
-		sched.ContainerSlaveMap[containerName] = acceptedHost
-		break
-	case shared.TaskTypes.CHECKPOINT_CONTAINER:
-		delete(sched.ContainerSlaveMap[containerName], acceptedHost)
-		break
-	case shared.TaskTypes.RESTORE_CONTAINER:
-		sched.ContainerSlaveMap[containerName] = acceptedHost
-		break
+	if status.State.Enum().String() == "TASK_FINISHED" {
+		labels := status.GetLabels()
+		taskType, err := shared.GetValueFromLabels(labels, shared.Tags.TASK_TYPE)
+		if err != nil{
+			log.Infof("ERROR: Malformed task info, discarding task with status: %v", status)
+			return
+		}
+		acceptedHost, err := shared.GetValueFromLabels(labels, shared.Tags.ACCEPTED_HOST)
+		if err != nil{
+			log.Infof("ERROR: Malformed task info, discarding task with status: %v", status)
+			return
+		}
+		containerName, err := shared.GetValueFromLabels(labels, shared.Tags.CONTAINER_NAME)
+		if err != nil{
+			log.Infof("ERROR: Malformed task info, discarding task with status: %v", status)
+			return
+		}
+		switch taskType {
+		case shared.TaskTypes.RUN_CONTAINER:
+			sched.ContainerSlaveMap[containerName] = acceptedHost
+			break
+		case shared.TaskTypes.CHECKPOINT_CONTAINER:
+			delete(sched.ContainerSlaveMap, containerName)
+			break
+		case shared.TaskTypes.RESTORE_CONTAINER:
+			sched.ContainerSlaveMap[containerName] = acceptedHost
+			break
+		}
 	}
 }
 
@@ -211,7 +213,7 @@ func (sched *ExampleScheduler) TestTask(containerID string) {
 func (sched *ExampleScheduler) RunContainerTask(containerName string) {
 	if val, ok := sched.ContainerSlaveMap[containerName]; ok {
 		msg := containerName+" has already been launched on "+val
-		log.Error(msg)
+		log.Infof(msg)
 		return
 	}
 	log.Infoln("Generating RUN_CONTAINER task...")
@@ -227,7 +229,7 @@ func (sched *ExampleScheduler) RunContainerTask(containerName string) {
 func (sched *ExampleScheduler) CheckpointContainerTask(containerName string) {
 	if _, ok := sched.ContainerSlaveMap[containerName]; !ok {
 		msg := containerName+" has not been launched yet!"
-		log.Error(msg)
+		log.Infof(msg)
 		return
 	}
 	log.Infoln("Generating CHECKPOINT_CONTAINER task...")

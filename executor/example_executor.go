@@ -106,7 +106,25 @@ func (mExecutor *migrationExecutor) StartContainer(containerName string, url str
 	out = out[0:len(out)-2] //for some reason necessary?
 	respBytes := writeOutputToServer("Initialized docker container: "+out, url)
 	fmt.Println("server responded with: "+ string(respBytes))
+}
 
+func (mExecutor *migrationExecutor) CheckpointContainer(containerName string, url string) {
+	container := docker.Docker{
+		Name: containerName,
+		Image: "busybox:latest",
+		Command: `/bin/sh -c 'i=0; while true; do echo "%s: $i"; i=$(expr $i + 1); sleep 1; done'`,
+	}
+
+	out := container.Export(url)
+	out = out[0:len(out)-2] //for some reason necessary?
+	respBytes := writeOutputToServer("Checkpointed docker container: "+out, url)
+	fmt.Println("server responded with: "+ string(respBytes))
+}
+
+func (mExecutor *migrationExecutor) RestoreContainer(containerName string, url string) {
+	container := docker.Import(url, containerName)
+	respBytes := writeOutputToServer(fmt.Sprintf("Restored docker container: %v", container), url)
+	fmt.Println("server responded with: "+ string(respBytes))
 }
 
 func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, taskInfo *mesos.TaskInfo) {
@@ -142,10 +160,16 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 
 	switch taskType {
 	case shared.TaskTypes.RUN_CONTAINER:
+		mExecutor.StartContainer(containerName, url)
+		break
 		break
 	case shared.TaskTypes.CHECKPOINT_CONTAINER:
+		mExecutor.CheckpointContainer(containerName, url)
+		break
 		break
 	case shared.TaskTypes.RESTORE_CONTAINER:
+		mExecutor.RestoreContainer(containerName, url)
+		break
 		break
 	case shared.TaskTypes.TEST_TASK:
 		mExecutor.TestRunAndKillContainer(containerName, url)
@@ -170,7 +194,7 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 
 func writeOutputToServer(output string, url string) (responseBytes []byte) {
 	fmt.Println("Here was the output of the command: "+ output)
-	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, output))))
+	req, _ := http.NewRequest("POST", url+"/in", bytes.NewReader([]byte(fmt.Sprintf(`{"in":"%s"}`, output))))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Fatalf("Got error 2", err)

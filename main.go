@@ -48,7 +48,7 @@ var (
 	master       = flag.String("master", "127.0.0.1:5050", "Master address <ip:port>")
 	executorPath = flag.String("executor", "./example_executor", "Path to test executor")
 	taskCount    = flag.String("task-count", "5", "Total task count to run.")
-	externalServer    = flag.String("externalServer", "192.168.0.15", "IP Address of the external server for hosting container files.")
+	externalServer    = flag.String("externalServer", "http://192.168.0.15:3000", "IP Address of the external server for hosting container files.")
 )
 
 func init() {

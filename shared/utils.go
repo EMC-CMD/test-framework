@@ -12,7 +12,7 @@ func GetValueFromLabels(labels *mesos.Labels, key string) (string, error) {
 			return *label.Value, nil
 		}
 	}
-	return nil, errors.New(fmt.Sprintf("KEY %s NOT FOUND IN TASK INFO! Here were the labels, if you want to see: %v", key, labels))
+	return "", errors.New(fmt.Sprintf("KEY %s NOT FOUND IN TASK INFO! Here were the labels, if you want to see: %v", key, labels))
 }
 
 func CreateLabel(key string, value string) *mesos.Label{
