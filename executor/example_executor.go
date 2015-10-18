@@ -93,6 +93,22 @@ func (mExecutor *migrationExecutor) TestRunAndKillContainer(containerName string
 
 }
 
+
+func (mExecutor *migrationExecutor) StartContainer(containerName string, url string) {
+	container := docker.Docker{
+		Name: containerName,
+		Image: "busybox:latest",
+		Command: `/bin/sh -c 'i=0; while true; do echo "%s: $i"; i=$(expr $i + 1); sleep 1; done'`,
+	}
+
+	//run counter in docker container
+	out := container.Run()
+	out = out[0:len(out)-2] //for some reason necessary?
+	respBytes := writeOutputToServer("Initialized docker container: "+out, url)
+	fmt.Println("server responded with: "+ string(respBytes))
+
+}
+
 func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 	fmt.Printf("Launching task %v with data [%#x]\n", taskInfo.GetName(), taskInfo.Data)
 
@@ -111,18 +127,27 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	run task
 	 ***/
 
-	taskType := getValueFromLabels(taskInfo.Labels, shared.TASK_TYPE)
-	url := getValueFromLabels(taskInfo.Labels, shared.FILESERVER_IP)
-	containerName := getValueFromLabels(taskInfo.Labels, shared.CONTAINER_NAME)
+	taskType, err := shared.GetValueFromLabels(taskInfo.Labels, shared.Tags.TASK_TYPE)
+	if err != nil {
+		fmt.Println("Got error", err)
+	}
+	url, err := shared.GetValueFromLabels(taskInfo.Labels, shared.Tags.FILESERVER_IP)
+	if err != nil {
+		fmt.Println("Got error", err)
+	}
+	containerName, err := shared.GetValueFromLabels(taskInfo.Labels, shared.Tags.CONTAINER_NAME)
+	if err != nil {
+		fmt.Println("Got error", err)
+	}
 
 	switch taskType {
-	case shared.RUN_CONTAINER:
+	case shared.TaskTypes.RUN_CONTAINER:
 		break
-	case shared.CHECKPOINT_CONTAINER:
+	case shared.TaskTypes.CHECKPOINT_CONTAINER:
 		break
-	case shared.RESTORE_CONTAINER:
+	case shared.TaskTypes.RESTORE_CONTAINER:
 		break
-	case shared.TEST_TASK:
+	case shared.TaskTypes.TEST_TASK:
 		mExecutor.TestRunAndKillContainer(containerName, url)
 		break
 	}
@@ -133,6 +158,7 @@ func (mExecutor *migrationExecutor) LaunchTask(driver executor.ExecutorDriver, t
 	fmt.Println("Finishing task", taskInfo.GetName())
 	finStatus := &mesos.TaskStatus{
 		TaskId: taskInfo.GetTaskId(),
+		Labels: taskInfo.Labels,
 		State:  mesos.TaskState_TASK_FINISHED.Enum(),
 	}
 	_, err = driver.SendStatusUpdate(finStatus)
@@ -175,16 +201,6 @@ func (mExecutor *migrationExecutor) Error(driver executor.ExecutorDriver, err st
 
 func init() {
 	flag.Parse()
-}
-
-func getValueFromLabels(labels *mesos.Labels, key string) string {
-	for _, label := range labels.Labels {
-		if *label.Key == key {
-			return *label.Value
-		}
-	}
-	log.Fatalf("KEY %s NOT FOUND IN TASK INFO! Here were the labels, if you want to see: %v", key, labels)
-	return ""
 }
 
 func main() {
