@@ -29,7 +29,7 @@ func (d *Docker) Create() string {
 	if d.Image == "" {
 		log.Fatalf("Image needs to be specified")
 	}
-	cmd := fmt.Sprintf(`create %s --name %s`, d.Image, d.Name)
+	cmd := fmt.Sprintf(`create --name %s %s`, d.Name, d.Image)
 	return dockerCommand(cmd)
 }
 
@@ -177,6 +177,7 @@ func Import(url string, containerName string) *Docker {
 	}
 	os.Remove(tarPath)
 	container := tarball.Container
+	container.Create()
 	container.Restore(imageDir)
 	return &container
 }
